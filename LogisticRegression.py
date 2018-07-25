@@ -1,50 +1,46 @@
+from tensorflow.examples.tutorials.mnist import input_data
 import tensorflow as tf
-import numpy as np
-import matplotlib.pyplot as plt
 
-X = tf.placeholder(tf.float32)
-Y = tf.placeholder(tf.float32)
+mnist = input_data.read_data_sets('data/', one_hot=True)
 
-w = tf.Variable(tf.random_normal([1], name='weight'))
-b = tf.Variable(tf.random_normal([1], name='bias'))
+#设置我们的参数
+numClasses = 10
+inputSize = 784
+trainingIterations = 50000
+batchSize = 64
 
-y_predict = tf.sigmoid(tf.add(tf.multiply(X, w), b))
-num_samples = 400
-cost = tf.reduce_sum(tf.pow(y_predict-Y, 2.0))/num_samples
+#指定好x和y的大小
+X = tf.placeholder(tf.float32, shape = [None, inputSize])
+y = tf.placeholder(tf.float32, shape = [None, numClasses])
 
-lr = 0.01
-optimizer = tf.train.AdamOptimizer().minimize(cost)
+#参数初始化
+W1 = tf.Variable(tf.random_normal([inputSize, numClasses], stddev=0.1))
+B1 = tf.Variable(tf.constant(0.1), [numClasses])
 
-# 创建session 并初始化所有变量
-num_epoch = 500
-cost_accum = []
-cost_prev = 0
-# np.linspace（）创建agiel等差数组，元素个素为num_samples
-xs = np.linspace(-5, 5, num_samples)
-ys = np.sin(xs) + np.random.normal(0, 0.01, num_samples)
+#构造模型
+y_pred = tf.nn.softmax(tf.matmul(X, W1) + B1)
 
-with tf.Session() as sess:
-    # 初始化所有变量
-    sess.run(tf.initialize_all_variables())
-    # 开始训练
-    for epoch in range(num_epoch):
-        for x, y in zip(xs, ys):
-            sess.run(optimizer, feed_dict={X: x, Y: y})
-        train_cost = sess.run(cost, feed_dict={X: x, Y: y})
-        cost_accum.append(train_cost)
-        print("train_cost is:", str(train_cost))
+loss = tf.reduce_mean(tf.square(y - y_pred))
+opt = tf.train.GradientDescentOptimizer(learning_rate = .05).minimize(loss)
 
-        # 当误差小于10-6时 终止训练
-        if np.abs(cost_prev - train_cost) < 1e-6:
-            break
-        # 保存最终的误差
-        cost_prev = train_cost
+correct_prediction = tf.equal(tf.argmax(y_pred,1), tf.argmax(y,1))
+accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 
-#画图  画出每一轮训练所有样本之后的误差
-plt.plot(range(len(cost_accum)),cost_accum,'r')
-plt.title('Logic Regression Cost Curve')
-plt.xlabel('epoch')
-plt.ylabel('cost')
-plt.show()
+sess = tf.Session()
+init = tf.global_variables_initializer()
+sess.run(init)
 
+#迭代计算
+for i in range(trainingIterations):
+    batch = mnist.train.next_batch(batchSize)
+    batchInput = batch[0]
+    batchLabels = batch[1]
+    _, trainingLoss = sess.run([opt, loss], feed_dict={X: batchInput, y: batchLabels})
+    if i%1000 == 0:
+        train_accuracy = accuracy.eval(session=sess, feed_dict={X: batchInput, y: batchLabels})
+        print ("step %d, training accuracy %g"%(i, train_accuracy))
 
+#测试结果
+batch = mnist.test.next_batch(batchSize)
+testAccuracy = sess.run(accuracy, feed_dict={X: batch[0], y: batch[1]})
+print ("test accuracy %g"%(testAccuracy))
